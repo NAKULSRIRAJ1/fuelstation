@@ -8,7 +8,10 @@ export default function BunkDashboard() {
   // App States
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('all');
-  const [toast, setToast] = useState(null); // NEW: Toast notification state
+  const [toast, setToast] = useState(null);
+  
+  // NEW: Live Clock State
+  const [currentTime, setCurrentTime] = useState(new Date());
 
   // Bunk Operations State
   const [bunkName] = useState('Eshwari filling station');
@@ -42,13 +45,21 @@ export default function BunkDashboard() {
   const [newRemarks, setNewRemarks] = useState('');
   const [newAmount, setNewAmount] = useState('');
 
-  // Preloader Timer
+  // Preloader Timer & Live Clock Interval
   useEffect(() => {
-    const timer = setTimeout(() => setLoading(false), 2500);
-    return () => clearTimeout(timer);
+    // Dismiss preloader after 2.8 seconds
+    const timer = setTimeout(() => setLoading(false), 2800);
+    
+    // Start Live Clock
+    const clockInterval = setInterval(() => setCurrentTime(new Date()), 1000);
+    
+    return () => {
+      clearTimeout(timer);
+      clearInterval(clockInterval);
+    };
   }, []);
 
-  // NEW: Helper function to show a toast message
+  // Helper function to show a toast message
   const showToast = (message) => {
     setToast(message);
     setTimeout(() => setToast(null), 3000);
@@ -104,6 +115,13 @@ export default function BunkDashboard() {
     showToast('Khata marked as cleared');
   };
 
+  // Calculations
+  const grossRevenue = Number(cashCollected) + Number(upiCollected) + Number(cardCollected);
+  const totalExpenses = expenseList.reduce((acc, curr) => acc + Number(curr.amount || 0), 0);
+  const netCashInTill = Number(cashCollected) - totalExpenses;
+  const totalKhata = khataTransactions.reduce((acc, curr) => acc + Number(curr.amount || 0), 0);
+
+  // --- Export Handlers ---
   const downloadPDF = () => {
     showToast('Generating Secure PDF...');
     const element = reportRef.current;
@@ -117,82 +135,110 @@ export default function BunkDashboard() {
     html2pdf().from(element).set(options).save();
   };
 
-  // Calculations
-  const grossRevenue = Number(cashCollected) + Number(upiCollected) + Number(cardCollected);
-  const totalExpenses = expenseList.reduce((acc, curr) => acc + Number(curr.amount || 0), 0);
-  const netCashInTill = Number(cashCollected) - totalExpenses;
-  const totalKhata = khataTransactions.reduce((acc, curr) => acc + Number(curr.amount || 0), 0);
+  // NEW: WhatsApp Sharing Function
+  const shareToWhatsApp = () => {
+    showToast('Opening WhatsApp...');
+    const dateStr = currentTime.toLocaleDateString('en-IN', { dateStyle: 'medium' });
+    const text = `*⛽ ${bunkName.toUpperCase()} - Shift Summary*\n*Date:* ${dateStr}\n*Supervisor:* ${manager}\n\n*💰 REVENUE*\nGross Cash: ₹${cashCollected}\nUPI/QR: ₹${upiCollected}\nCard Swipe: ₹${cardCollected}\n*Total Revenue:* ₹${grossRevenue}\n\n*📉 EXPENSES & KHATA*\nTotal Expenses: ₹${totalExpenses}\nNew Khata Issued: ₹${totalKhata}\n\n*✅ NET CASH IN TILL: ₹${netCashInTill}*`;
+    
+    const whatsappUrl = `https://wa.me/?text=${encodeURIComponent(text)}`;
+    window.open(whatsappUrl, '_blank');
+  };
 
   // ==========================================
-  // CUSTOM CSS FOR ANIMATIONS
+  // CUSTOM CSS FOR ANIMATIONS & PRELOADER
   // ==========================================
   const customStyles = `
-    @keyframes drop {
-      0% { transform: translateY(0px) scaleY(0.5); opacity: 0; }
-      10% { opacity: 1; transform: translateY(5px) scaleY(1); }
-      80% { transform: translateY(45px) scaleY(1.2); opacity: 1; }
-      100% { transform: translateY(55px) scaleY(0.5); opacity: 0; }
+    /* Neon Fuel Gauge Preloader Animations */
+    .gauge-bg { fill: none; stroke: #1e293b; stroke-width: 10; stroke-linecap: round; }
+    .gauge-fill {
+      fill: none; stroke-width: 10; stroke-linecap: round;
+      stroke-dasharray: 141; /* Half of circle circumference */
+      stroke-dashoffset: 141;
+      animation: fillGauge 2.2s cubic-bezier(0.4, 0, 0.2, 1) forwards;
     }
-    .fuel-drop { animation: drop 1.2s infinite ease-in; }
-    .fuel-drop:nth-child(2) { animation-delay: 0.4s; }
-    .fuel-drop:nth-child(3) { animation-delay: 0.8s; }
-    
-    @keyframes ripple {
-      0% { width: 0%; opacity: 1; }
-      100% { width: 100%; opacity: 0; }
+    @keyframes fillGauge {
+      0% { stroke-dashoffset: 141; stroke: #ef4444; filter: drop-shadow(0 0 5px rgba(239, 68, 68, 0.5)); }
+      60% { stroke: #f59e0b; filter: drop-shadow(0 0 10px rgba(245, 158, 11, 0.6)); }
+      100% { stroke-dashoffset: 0; stroke: #10b981; filter: drop-shadow(0 0 20px rgba(16, 185, 129, 0.8)); }
     }
-    .tank-ripple { animation: ripple 1.2s infinite ease-out; }
+    .gauge-needle {
+      transform-origin: 50px 50px;
+      animation: sweepNeedle 2.2s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+    }
+    @keyframes sweepNeedle {
+      0% { transform: rotate(-90deg); }
+      100% { transform: rotate(90deg); }
+    }
+    .status-text { animation: pulseStatus 2.2s forwards; }
+    @keyframes pulseStatus {
+      0% { color: #ef4444; }
+      60% { color: #f59e0b; }
+      100% { color: #10b981; text-shadow: 0 0 12px rgba(16, 185, 129, 0.5); }
+    }
 
+    /* UI Transitions */
     @keyframes slideUpFade {
       from { opacity: 0; transform: translateY(15px); }
       to { opacity: 1; transform: translateY(0); }
     }
-    .animate-slide-up {
-      animation: slideUpFade 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-    }
+    .animate-slide-up { animation: slideUpFade 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
     
     @keyframes slideInRight {
       from { opacity: 0; transform: translateX(50px); }
       to { opacity: 1; transform: translateX(0); }
     }
-    .toast-enter {
-      animation: slideInRight 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-    }
+    .toast-enter { animation: slideInRight 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
   `;
 
+  // ==========================================
+  // 1. NEON FUEL GAUGE PRELOADER
+  // ==========================================
   if (loading) {
     return (
-      <div className="min-h-screen bg-[#0b1120] flex flex-col items-center justify-center p-4">
+      <div className="min-h-screen bg-[#070b14] flex flex-col items-center justify-center p-4">
         <style>{customStyles}</style>
-        <div className="flex flex-col items-center space-y-12">
-          <div className="relative flex flex-col items-center">
-            <svg xmlns="http://www.w3.org/2000/svg" className="w-16 h-16 text-slate-400 drop-shadow-lg z-10 relative" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M3 22v-8c0-1.5.5-3 2-4l4-4h7.5c.8 0 1.5.7 1.5 1.5v3.5l-2.5-1.5v-3H13v3.5c0 1.2-1 2.2-2.2 2.2h-3C6.7 12 6 12.7 6 13.8V22H3z"/>
-              <path d="M19 15v7"/><path d="M15 15v7"/><path d="M15 15c0-2.2 1.8-4 4-4h1c1.1 0 2 .9 2 2v7h-7v-5z"/>
+        <div className="flex flex-col items-center space-y-10">
+          
+          {/* SVG Fuel Gauge */}
+          <div className="relative w-48 h-28 overflow-hidden flex justify-center">
+            <svg viewBox="0 0 100 50" className="w-full h-full transform scale-125 translate-y-4">
+              {/* Background Track */}
+              <path className="gauge-bg" d="M 10 50 A 40 40 0 0 1 90 50" />
+              {/* Glowing Animated Fill */}
+              <path className="gauge-fill" d="M 10 50 A 40 40 0 0 1 90 50" />
+              {/* Center Pivot */}
+              <circle cx="50" cy="50" r="4" fill="#334155" />
+              {/* Animated Needle */}
+              <line className="gauge-needle" x1="50" y1="50" x2="15" y2="50" stroke="#cbd5e1" strokeWidth="2" strokeLinecap="round" />
             </svg>
-            <div className="absolute top-12 flex flex-col items-center w-full h-16">
-              <div className="fuel-drop absolute w-2 h-4 bg-amber-400 rounded-full shadow-[0_0_8px_rgba(251,191,36,0.8)]"></div>
-              <div className="fuel-drop absolute w-2 h-4 bg-amber-400 rounded-full shadow-[0_0_8px_rgba(251,191,36,0.8)]"></div>
-              <div className="fuel-drop absolute w-2 h-4 bg-amber-400 rounded-full shadow-[0_0_8px_rgba(251,191,36,0.8)]"></div>
-            </div>
-            <div className="mt-16 relative w-24 h-1.5 bg-slate-800 rounded-full overflow-hidden">
-               <div className="tank-ripple absolute left-1/2 -translate-x-1/2 top-0 h-full bg-amber-400 rounded-full"></div>
+            <div className="absolute bottom-0 left-0 w-full flex justify-between px-6 text-[10px] font-bold text-slate-500">
+              <span className="text-rose-500">E</span>
+              <span className="text-emerald-500">F</span>
             </div>
           </div>
-          <div className="text-center space-y-2">
-            <h1 className="text-2xl sm:text-3xl font-black tracking-widest text-slate-100 uppercase drop-shadow-md">{bunkName}</h1>
-            <p className="text-xs text-amber-500/80 font-mono tracking-[0.2em] uppercase">Initializing Secure Ledgers...</p>
+
+          <div className="text-center space-y-2 mt-4">
+            <h1 className="text-3xl font-black tracking-widest text-slate-100 uppercase drop-shadow-md">
+              {bunkName}
+            </h1>
+            <p className="status-text text-sm font-mono tracking-[0.2em] uppercase font-bold">
+              System Primed & Ready
+            </p>
           </div>
         </div>
       </div>
     );
   }
 
+  // ==========================================
+  // 2. CORE DASHBOARD VIEW
+  // ==========================================
   return (
     <div className="min-h-screen bg-[#0b1120] text-slate-200 p-4 md:p-8 font-sans selection:bg-amber-500/30 overflow-x-hidden relative">
       <style>{customStyles}</style>
 
-      {/* NEW: Toast Notification */}
+      {/* Toast Notification */}
       {toast && (
         <div className="toast-enter fixed bottom-6 right-6 z-50 bg-[#1e293b] border border-amber-500/30 text-white px-5 py-3 rounded-lg shadow-[0_10px_40px_rgba(0,0,0,0.5)] flex items-center gap-3">
           <svg className="w-5 h-5 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
@@ -202,13 +248,23 @@ export default function BunkDashboard() {
 
       <div className="max-w-6xl mx-auto">
         
-        {/* Navigation Head */}
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-[#111827] p-5 rounded-2xl border border-slate-800 shadow-xl mb-6">
-          <div>
-            <h1 className="text-xl font-bold text-white uppercase tracking-wider">{bunkName}</h1>
-            <p className="text-xs text-slate-400 mt-0.5">Shift Operations Management Console</p>
+        {/* Navigation Head with LIVE CLOCK */}
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-[#111827] p-5 rounded-2xl border border-slate-800 shadow-xl mb-6 relative overflow-hidden">
+          <div className="absolute top-0 right-0 w-32 h-32 bg-blue-500/5 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2"></div>
+          
+          <div className="flex justify-between w-full sm:w-auto items-center">
+            <div>
+              <h1 className="text-xl font-bold text-white uppercase tracking-wider">{bunkName}</h1>
+              <div className="flex items-center gap-2 mt-1">
+                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                <p className="text-xs text-slate-400 font-mono">
+                  {currentTime.toLocaleDateString('en-IN', { weekday: 'short', day: '2-digit', month: 'short' })} • <span className="text-amber-400/90 font-bold">{currentTime.toLocaleTimeString('en-IN')}</span>
+                </p>
+              </div>
+            </div>
           </div>
-          <div className="flex bg-[#0b1120] p-1.5 rounded-xl border border-slate-800 w-full sm:w-auto shadow-inner relative">
+
+          <div className="flex bg-[#0b1120] p-1.5 rounded-xl border border-slate-800 w-full sm:w-auto shadow-inner relative z-10">
             <button onClick={() => setActiveTab('all')} className={`flex flex-1 sm:flex-none justify-center items-center gap-2 px-6 py-2 rounded-lg text-sm font-semibold transition-all duration-300 ${activeTab === 'all' ? 'bg-amber-500 text-slate-900 shadow-md transform scale-105' : 'text-slate-400 hover:text-slate-200'}`}>
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path></svg>
               Master Inputs
@@ -420,10 +476,18 @@ export default function BunkDashboard() {
                 <h2 className="text-xl font-black text-white tracking-wide">Shift Reconciliation Finalized</h2>
                 <p className="text-sm text-amber-500/80 mt-1 font-medium">Verify final balances before generating official print records.</p>
               </div>
-              <button onClick={downloadPDF} className="relative z-10 w-full sm:w-auto flex justify-center items-center gap-2 bg-blue-600 hover:bg-blue-500 font-bold text-white px-8 py-3.5 rounded-xl shadow-[0_0_15px_rgba(37,99,235,0.4)] transition-all hover:scale-105 active:scale-95">
-                <svg className="w-5 h-5 animate-bounce" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
-                Download PDF
-              </button>
+              <div className="flex flex-col sm:flex-row gap-3 relative z-10 w-full sm:w-auto">
+                {/* WHATSAPP SHARE BUTTON */}
+                <button onClick={shareToWhatsApp} className="flex justify-center items-center gap-2 bg-[#25D366] hover:bg-[#20bd5a] text-slate-900 font-bold px-6 py-3.5 rounded-xl shadow-[0_0_15px_rgba(37,211,102,0.3)] transition-all hover:scale-105 active:scale-95">
+                  <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
+                  Share
+                </button>
+                {/* PDF DOWNLOAD BUTTON */}
+                <button onClick={downloadPDF} className="flex justify-center items-center gap-2 bg-blue-600 hover:bg-blue-500 font-bold text-white px-8 py-3.5 rounded-xl shadow-[0_0_15px_rgba(37,99,235,0.4)] transition-all hover:scale-105 active:scale-95">
+                  <svg className="w-5 h-5 animate-bounce" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
+                  PDF
+                </button>
+              </div>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
